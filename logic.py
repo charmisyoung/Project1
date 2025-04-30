@@ -1,0 +1,214 @@
+"""
+Module for Banking Application logic
+Contains Logic class that connects UI to account management logic
+"""
+from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import *
+
+from gui import *
+from accounts import *
+
+
+class Logic(QMainWindow, Ui_BankingApplication):
+    """
+    Main logic for banking app
+
+    Logic class connects UI and account management logic
+    """
+    def __init__(self) -> None:
+        """Initialize logic for banking app"""
+        super().__init__()
+
+        self.setupUi(self)
+
+        self.account_manager = AccountManager()
+
+        self.create_acct_button.clicked.connect(self.create_account)
+        self.deposit_button.clicked.connect(self.deposit)
+        self.withdraw_button.clicked.connect(self.withdraw)
+        self.select_acct_combobox.currentTextChanged.connect(self.update_account_details)
+
+        self.refresh_ui()
+
+
+    def refresh_ui(self) -> None:
+        """Refresh with latest account data"""
+        self.update_select_acct_combobox()
+        self.update_account_details()
+
+
+    def update_select_acct_combobox(self) -> None:
+        accounts = self.account_manager.get_all_accounts()
+
+        current_text = self.select_acct_combobox.currentText()
+
+        self.select_acct_combobox.clear()
+
+        self.select_acct_combobox.addItem("--Select an account--")
+
+        for account in accounts:
+            self.select_acct_combobox.addItem(account.get_name())
+
+        if current_text:
+            index = self.select_acct_combobox.findText(current_text)
+            if index >= 0:
+                self.select_acct_combobox.setCurrentIndex(index)
+        else:
+            self.select_acct_combobox.setCurrentIndex(0)
+
+        index = self.select_acct_combobox.findText(current_text)
+        if index >= 0:
+            self.select_acct_combobox.setCurrentIndex(index)
+
+
+    def update_account_details(self) -> None:
+        """Update account details of selected account"""
+        account_name = self.select_acct_combobox.currentText()
+        account = self.account_manager.get_account(account_name)
+
+        if account:
+            self.balance_message_label.setText(f"Welcome {account.get_name()}\n"
+                                               f"Your account balance is ${account.get_balance():.2f}")
+        else:
+            self.balance_message_label.setText(f"Welcome. Create or select an account to continue.")
+
+
+    def create_account(self) -> None:
+        """Create a new account with UI data"""
+        try:
+            name = self.account_name_input.text()
+
+            if not name:
+                QMessageBox.warning(self, "Error",  "Account name cannot be empty")
+                return
+
+            account_type = 'regular'
+            
+            pin = self.set_pin_input.text()
+            
+            if not pin.isdigit() or len(pin) != 4:
+                QMessageBox.warning(self,"Error", "PIN must be 4 digits.")
+                return
+
+            try:
+                balance = float(self.initial_balance_input.text() or "0")
+                if balance < 0:
+                    QMessageBox.warning(self, "Error",  "Initial balance cannot be negative.")
+                    return
+            except ValueError:
+                QMessageBox.warning(self, "Error",  "Enter a valid number for initial balance.")
+                return
+
+            if self.account_manager.get_account(name):
+                QMessageBox.warning(self, "Error",  "An account with this name already exists.")
+                return
+
+            account = self.account_manager.create_account(name, balance, pin)
+
+            self.refresh_ui()
+            self.statusbar.showMessage(f"Account '{name}' created successfully.")
+
+            self.account_name_input.clear()
+            self.initial_balance_input.clear()
+            self.set_pin_input.clear()
+
+
+        except Exception as e:
+            QMessageBox.warning(self, "Error",  f"An error occurred: {e}")
+
+
+    def verify_pin(self) -> bool:
+        """Verify PIN before transaction"""
+        account_name = self.select_acct_combobox.currentText()
+        account = self.account_manager.get_account(account_name)
+
+        if not account:
+            QMessageBox.warning(self,"Error", "No account selected.")
+            return False
+
+        user_pin = self.pin_input.text()
+
+        if not user_pin:
+            QMessageBox.warning(self,"Error", "Please enter your PIN")
+            return False
+
+        if not account.verify_pin(user_pin):
+            QMessageBox.warning(self,"Error", "Incorrect PIN")
+            return False
+
+        return True
+
+
+    def deposit(self) -> None:
+        """Deposit money into selected account"""
+        try:
+            if not self.verify_pin():
+                return
+
+            account_name = self.select_acct_combobox.currentText()
+
+            try:
+                amount = float(self.amount_input.text() or "0")
+                if amount <= 0:
+                    QMessageBox.warning(self, "Error",  "Amount must be greater than zero.")
+                    return
+            except ValueError:
+                QMessageBox.warning(self, "Error",  "Please enter a valid number.")
+                return
+
+            account = self.account_manager.get_account(account_name)
+
+            if not account:
+                QMessageBox.warning(self, "Error",  "No account selected.")
+                return
+
+            success = account.deposit(amount)
+
+            if success:
+                self.account_manager.save_accounts()
+                self.refresh_ui()
+                self.statusbar.showMessage(f"Deposit successful")
+
+                self.amount_input.clear()
+                self.pin_input.clear()
+            else:
+                QMessageBox.warning(self, "Error",  "Deposit failed.")
+        except Exception:
+            return
+
+    def withdraw(self) -> None:
+        """Withdraw money from the selected account"""
+        try:
+            if not self.verify_pin():
+                return
+
+            account_name = self.select_acct_combobox.currentText()
+
+            try:
+                amount = float(self.amount_input.text() or "0")
+                if amount <= 0:
+                    QMessageBox.warning(self, "Error",  "Amount must be greater than zero.")
+                    return
+            except ValueError:
+                QMessageBox.warning(self, "Error",  "Enter a valid number.")
+                return
+
+            account = self.account_manager.get_account(account_name)
+
+            if not account:
+                QMessageBox.warning(self,"Error","No account selected.")
+                return
+
+            success = account.withdraw(amount)
+
+            if success:
+                self.account_manager.save_accounts()
+                self.refresh_ui()
+                self.statusbar.showMessage(f"Withdrawal successful")
+
+                self.amount_input.clear()
+                self.pin_input.clear()
+            else:
+                QMessageBox.warning(self, "Error",  "Withdrawal failed.")
+        except Exception:
+            return
