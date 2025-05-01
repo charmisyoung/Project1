@@ -27,6 +27,11 @@ class Logic(QMainWindow, Ui_BankingApplication):
         self.deposit_button.clicked.connect(self.deposit)
         self.withdraw_button.clicked.connect(self.withdraw)
         self.select_acct_combobox.currentTextChanged.connect(self.update_account_details)
+        self.login_button.clicked.connect(self.login)
+        self.nav_to_create_button.clicked.connect(self.show_create_account)
+        self.nav_to_login_button.clicked.connect(self.show_login)
+
+        self.show_create_account()
 
         self.refresh_ui()
 
@@ -73,6 +78,63 @@ class Logic(QMainWindow, Ui_BankingApplication):
             self.balance_message_label.setText(f"Welcome. Create or select an account to continue.")
 
 
+    def show_login(self) -> None:
+        """Show login form once account created"""
+        self.login_box.setVisible(True)
+        self.create_account_box.setVisible(False)
+        self.select_acct_box.setVisible(True)
+        self.transaction_box.setVisible(True)
+        self.balance_message_label.setVisible(True)
+
+
+    def show_create_account(self) -> None:
+        """Show create account screen upon entering"""
+        self.create_account_box.setVisible(True)
+        self.login_box.setVisible(False)
+        self.select_acct_box.setVisible(True)
+        self.transaction_box.setVisible(True)
+        self.balance_message_label.setVisible(True)
+
+
+    def login(self) -> None:
+        """Handle the login process"""
+        try:
+            account_name = self.account_login_input.text()
+            pin = self.pin_login_input.text()
+
+            if not account_name:
+                QMessageBox.warning(self, "Error", "Please enter an account name")
+                return
+
+            if not pin:
+                QMessageBox.warning(self, "Error", "Please enter your PIN")
+                return
+
+            account = self.account_manager.get_account(account_name)
+
+            if not account:
+                QMessageBox.warning(self, "Error", "Account not found")
+                return
+
+            if not account.verify_pin(pin):
+                QMessageBox.warning(self, "Error", "Incorrect PIN")
+                return
+
+            index = self.select_acct_combobox.findText(account_name)
+            if index >= 0:
+                self.select_acct_combobox.setCurrentIndex(index)
+
+                self.update_account_details()
+
+                self.account_login_input.clear()
+                self.pin_login_input.clear()
+
+                self.statusbar.showMessage(f"Logged in as {account_name}")
+
+        except Exception as e:
+            QMessageBox.warning(self, "Error", f"An error occurred: {e}")
+
+
     def create_account(self) -> None:
         """Create a new account with UI data"""
         try:
@@ -112,6 +174,9 @@ class Logic(QMainWindow, Ui_BankingApplication):
             self.initial_balance_input.clear()
             self.set_pin_input.clear()
 
+            self.account_login_input.setText(name)
+
+            self.show_login()
 
         except Exception as e:
             QMessageBox.warning(self, "Error",  f"An error occurred: {e}")
