@@ -106,7 +106,7 @@ class Logic(QMainWindow, Ui_BankingApplication):
         """PIN verification for select account section"""
         account_name = self.select_acct_combobox.currentText()
 
-        if not account_name or account_name == "-- Select Account --":
+        if not account_name or account_name == "--Select Account--":
             QMessageBox.warning(self, "Error", "Please select an account")
             return
 
