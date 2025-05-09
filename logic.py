@@ -22,16 +22,22 @@ class Logic(QMainWindow, Ui_BankingApplication):
         self.setupUi(self)
 
         self.account_manager = AccountManager()
+        self.current_account = None
+        self.last_verified_account = ""
 
         self.create_acct_button.clicked.connect(self.create_account)
         self.deposit_button.clicked.connect(self.deposit)
         self.withdraw_button.clicked.connect(self.withdraw)
-        self.select_acct_combobox.currentTextChanged.connect(self.update_account_details)
+        self.select_acct_combobox.currentTextChanged.connect(self.account_selection_change)
         self.login_button.clicked.connect(self.login)
         self.nav_to_create_button.clicked.connect(self.show_create_account)
         self.nav_to_login_button.clicked.connect(self.show_login)
+        self.enter_pin_validate.clicked.connect(self.verify_selected_account)
 
         self.show_create_account()
+
+        self.deposit_button.setEnabled(False)
+        self.withdraw_button.setEnabled(False)
 
         self.refresh_ui()
 
@@ -71,11 +77,60 @@ class Logic(QMainWindow, Ui_BankingApplication):
         account_name = self.select_acct_combobox.currentText()
         account = self.account_manager.get_account(account_name)
 
-        if account:
+        if self.current_account:
             self.balance_message_label.setText(f"Welcome {account.get_name()}\n"
                                                f"Your account balance is ${account.get_balance():.2f}")
+            self.deposit_button.setEnabled(True)
+            self.withdraw_button.setEnabled(True)
         else:
             self.balance_message_label.setText(f"Welcome. Create or select an account to continue.")
+            self.deposit_button.setEnabled(False)
+            self.withdraw_button.setEnabled(False)
+
+
+    def account_selection_change(self) -> None:
+        """Handle when account selection changes"""
+        account_name = self.select_acct_combobox.currentText()
+
+        if account_name != self.last_verified_account:
+            self.current_account = None
+            self.update_account_details()
+
+            if account_name and account_name != "--Select Account --":
+                self.statusbar.showMessage(f"{account_name}, please verify your PIN to continue.")
+            else:
+                self.statusbar.showMessage("")
+
+
+    def verify_selected_account(self) -> None:
+        """PIN verification for select account section"""
+        account_name = self.select_acct_combobox.currentText()
+
+        if not account_name or account_name == "-- Select Account --":
+            QMessageBox.warning(self, "Error", "Please select an account")
+            return
+
+        user_pin = self.pin_input.text()
+
+        if not user_pin:
+            QMessageBox.warning(self, "Error", "Please enter your PIN")
+            return
+
+        account = self.account_manager.get_account(account_name)
+
+        if not account:
+            QMessageBox.warning(self, "Error", "Account not found")
+            return
+
+        if not account.verify_pin(user_pin):
+            QMessageBox.warning(self, "Error", "Incorrect PIN")
+            return
+
+        self.current_account = account
+        self.last_verified_account = account_name
+        self.update_account_details()
+        self.statusbar.showMessage(f"Welcome, {account_name}.")
+        self.pin_input.clear()
 
 
     def show_login(self) -> None:
